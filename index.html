@@ -680,8 +680,63 @@
             renderSkinLogs();
             updateNotificationUI();
 
+            // Self-registering PWA components
+            setupPWAManifestAndWorker();
+
             startNotificationDaemon();
         });
+
+        // Dynamic PWA Generator & Service Worker Installer
+        function setupPWAManifestAndWorker() {
+            // 1. Dynamic Injection of Web App Manifest
+            const manifest = {
+                name: "Gaurav's Skin Expert Companion",
+                short_name: "SkinExpert",
+                description: "Personalized De-Tanning Tracker for Gaurav",
+                start_url: window.location.href,
+                display: "standalone",
+                background_color: "#0f172a",
+                theme_color: "#0d9488",
+                icons: [
+                    {
+                        src: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='128' fill='%230d9488'/><path d='M256 128v256M128 256h256' stroke='white' stroke-width='48' stroke-linecap='round'/></svg>",
+                        sizes: "512x512",
+                        type: "image/svg+xml"
+                    }
+                ]
+            };
+            const manifestStr = JSON.stringify(manifest);
+            const manifestBlob = new Blob([manifestStr], { type: 'application/json' });
+            const manifestURL = URL.createObjectURL(manifestBlob);
+            
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = manifestURL;
+            document.head.appendChild(link);
+
+            // 2. Dynamic Register of local caching fallback thread (Service Worker)
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    const CACHE_NAME = 'gaurav-skin-expert-v3';
+                    self.addEventListener('install', (e) => {
+                        self.skipWaiting();
+                    });
+                    self.addEventListener('activate', (e) => {
+                        self.clients.claim();
+                    });
+                    self.addEventListener('fetch', (e) => {
+                        e.respondWith(
+                            fetch(e.request).catch(() => caches.match(e.request))
+                        );
+                    });
+                `;
+                const swBlob = new Blob([swCode], { type: 'application/javascript' });
+                const swURL = URL.createObjectURL(swBlob);
+                navigator.serviceWorker.register(swURL).catch(err => {
+                    console.log("Local standalone sw.js registration required for native app wrappers.");
+                });
+            }
+        }
 
         // Local Storage Helpers
         function loadPersistedData() {
